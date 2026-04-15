@@ -1,0 +1,1161 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Postür Takip Sistemi</title>
+<style>
+
+body {
+  background: #020617;
+  color: #e2e8f0;
+  font-family: 'Segoe UI', sans-serif;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
+/* kötü duruş olunca ekran kenarı kırmızı yanıyor */
+#tehlikeBorder {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  border: 5px solid #ef4444;
+  pointer-events: none;
+  z-index: 9000;
+  animation: kenarYan 1s ease-in-out infinite;
+}
+#tehlikeBorder.acik { display: block; }
+
+@keyframes kenarYan {
+  0%, 100% { border-color: rgba(239, 68, 68, 0.85); }
+  50%       { border-color: rgba(239, 68, 68, 0.2); }
+}
+
+/* skor çok düşünce ortaya çıkan büyük uyarı */
+#buyukUyari {
+  display: none;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 9100;
+  pointer-events: none;
+  text-align: center;
+}
+#buyukUyari.goster {
+  display: block;
+  animation: cikAnim 0.35s ease-out;
+}
+
+@keyframes cikAnim {
+  from { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+  to   { transform: translate(-50%, -50%) scale(1);   opacity: 1; }
+}
+
+#buyukUyari .baslik {
+  font-size: 58px;
+  font-weight: 900;
+  color: #ef4444;
+  text-shadow: 0 0 30px rgba(239,68,68,0.9);
+  line-height: 1;
+}
+#buyukUyari .altYazi {
+  font-size: 19px;
+  font-weight: 600;
+  color: #fca5a5;
+  margin-top: 10px;
+}
+
+/* mola ekranı - 45 dk dolduğunda açılıyor */
+#molaEkrani {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(2, 6, 23, 0.96);
+  z-index: 9500;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+}
+#molaEkrani.acik {
+  display: flex;
+  animation: belir 0.4s ease;
+}
+
+@keyframes belir { from { opacity: 0; } to { opacity: 1; } }
+
+.mola-baslik { font-size: 36px; font-weight: 900; color: #22d3ee; }
+.mola-aciklama { font-size: 15px; color: #94a3b8; text-align: center; max-width: 400px; line-height: 1.6; }
+
+.egzersiz-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  max-width: 520px;
+  width: 100%;
+}
+
+.egzersiz-kart {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.egzersiz-kart .ikon { font-size: 22px; }
+.egzersiz-kart .metin { font-size: 13px; line-height: 1.5; }
+.egzersiz-kart .metin strong {
+  color: #22d3ee;
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 2px;
+}
+
+.mola-butonlar { display: flex; gap: 12px; }
+.buton {
+  padding: 11px 26px;
+  border-radius: 9px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+}
+.buton-ana { background: #6366f1; color: #fff; }
+.buton-gec { background: #1e293b; color: #94a3b8; border: 1px solid #334155; }
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 26px;
+  background: #0f172a;
+  border-bottom: 1px solid #334155;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.logo-alani { display: flex; align-items: center; gap: 10px; }
+.logo-kutu {
+  width: 36px; height: 36px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, #6366f1, #22d3ee);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 17px;
+}
+.logo-yazi { font-size: 17px; font-weight: 800; }
+.logo-yazi span { color: #22d3ee; }
+
+.mola-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 20px;
+  font-size: 12px;
+  color: #94a3b8;
+  cursor: pointer;
+}
+.mola-pill.yakin { border-color: #f59e0b; color: #f59e0b; }
+.mola-pill.simdi { border-color: #ef4444; color: #ef4444; }
+
+.sag-menu { display: flex; align-items: center; gap: 12px; }
+#oturumSaati { font-size: 12px; color: #94a3b8; }
+
+.durum-rozet {
+  display: flex; align-items: center; gap: 7px;
+  padding: 5px 12px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 20px;
+  font-size: 12px; color: #94a3b8;
+}
+.nokta {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: #94a3b8;
+}
+.nokta.canli {
+  background: #22c55e;
+  box-shadow: 0 0 7px #22c55e;
+  animation: yanip 2s infinite;
+}
+@keyframes yanip { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+.icerik {
+  display: grid;
+  grid-template-columns: 660px 1fr;
+  gap: 18px;
+  padding: 18px 22px;
+  max-width: 1380px;
+  margin: 0 auto;
+}
+
+.sol-sutun { display: flex; flex-direction: column; gap: 14px; }
+
+.kamera-kutu {
+  position: relative;
+  width: 640px; height: 480px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 2px solid #334155;
+  background: #000;
+}
+#video, #canvas {
+  position: absolute;
+  top: 0; left: 0;
+  width: 640px; height: 480px;
+}
+
+#kameraCerceve {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  border-radius: 12px;
+  pointer-events: none;
+}
+#kameraCerceve.iyi  { border: 3px solid #22c55e; }
+#kameraCerceve.kotu { border: 3px solid #ef4444; }
+
+#kameraYazi {
+  display: none;
+  position: absolute;
+  top: 14px; left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 18px;
+  border-radius: 7px;
+  font-size: 14px; font-weight: 700;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 5;
+}
+#kameraYazi.iyi  { display:block; background: rgba(34,197,94,0.88); color:#fff; }
+#kameraYazi.kotu { display:block; background: rgba(239,68,68,0.92); color:#fff; animation: salla 0.4s ease; }
+
+@keyframes salla {
+  0%,100% { transform: translateX(-50%) translateX(0); }
+  25%     { transform: translateX(-50%) translateX(-5px); }
+  75%     { transform: translateX(-50%) translateX(5px); }
+}
+
+.istatistikler {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+.stat-kutu {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 11px 12px;
+  text-align: center;
+}
+.stat-kutu .etiket {
+  font-size: 10px;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 4px;
+}
+.stat-kutu .deger { font-size: 22px; font-weight: 800; }
+
+.sag-sutun { display: flex; flex-direction: column; gap: 14px; }
+
+.skor-kart {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+}
+.kart-baslik {
+  font-size: 11px;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 14px;
+}
+
+.halka-sargisi { position: relative; display: inline-block; }
+.halka-svg { width: 130px; height: 130px; transform: rotate(-90deg); display: block; }
+.halka-arka { fill: none; stroke: #1e293b; stroke-width: 11; }
+.halka-on {
+  fill: none;
+  stroke-width: 11;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.7s ease, stroke 0.3s;
+}
+
+.halka-sayi {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 34px; font-weight: 900;
+}
+.halka-aciklama { font-size: 14px; font-weight: 600; margin-top: 6px; }
+
+.metrik-kart {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 18px;
+}
+.metrik-satir {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 0;
+  border-bottom: 1px solid #334155;
+}
+.metrik-satir:last-child { border-bottom: none; }
+
+.metrik-bilgi .ad  { font-size: 13px; font-weight: 600; }
+.metrik-bilgi .alt { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+
+.metrik-sag { display: flex; align-items: center; gap: 9px; }
+
+.metrik-deger {
+  font-size: 17px; font-weight: 700;
+  width: 50px; text-align: right;
+}
+
+.bar-kap { width: 72px; height: 5px; background: #1e293b; border-radius: 3px; overflow: hidden; }
+.bar-ic  { height: 100%; border-radius: 3px; transition: width 0.4s ease, background 0.3s; }
+
+.durum-etiket {
+  font-size: 10px; font-weight: 700;
+  padding: 2px 7px; border-radius: 10px;
+  min-width: 50px; text-align: center;
+  text-transform: uppercase;
+}
+.d-iyi  { background: rgba(34,197,94,0.14);  color: #22c55e; }
+.d-orta { background: rgba(245,158,11,0.14); color: #f59e0b; }
+.d-kotu { background: rgba(239,68,68,0.14);  color: #ef4444; }
+.d-bos  { background: transparent; color: #94a3b8; }
+
+.uyari-kart {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 18px;
+}
+.uyari-satir {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 9px 0;
+  border-bottom: 1px solid #334155;
+  font-size: 13px;
+}
+.uyari-satir:last-child { border-bottom: none; }
+.uyari-ikon   { font-size: 15px; flex-shrink: 0; }
+.uyari-baslik { font-weight: 500; }
+.uyari-not    { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+.uyari-yok    { text-align: center; padding: 16px; color: #22c55e; font-size: 13px; }
+
+.ipucu-kart {
+  background: linear-gradient(135deg, rgba(99,102,241,0.12), rgba(34,211,238,0.08));
+  border: 1px solid rgba(99,102,241,0.3);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex; gap: 12px; align-items: flex-start;
+}
+.ipucu-ikon  { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+.ipucu-metin { font-size: 12px; color: #94a3b8; line-height: 1.6; }
+.ipucu-metin strong {
+  color: #22d3ee; font-size: 11px; display: block;
+  text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px;
+}
+
+@media (max-width: 1080px) {
+  .icerik { grid-template-columns: 1fr; }
+  .kamera-kutu, #video, #canvas { width: 100%; max-width: 640px; }
+  .istatistikler { grid-template-columns: repeat(2, 1fr); }
+}
+
+</style>
+</head>
+<body>
+
+<div id="tehlikeBorder"></div>
+
+<div id="buyukUyari">
+  <div class="baslik">⚠ DURUŞUNU DÜZELT!</div>
+  <div class="altYazi" id="buyukUyariAlt">–</div>
+</div>
+
+<!-- mola ekranı -->
+<div id="molaEkrani">
+  <div style="font-size:68px">☕</div>
+  <div class="mola-baslik">Mola Zamanı!</div>
+  <div class="mola-aciklama">
+    Ekrandan uzaklaş, gözlerini dinlendir.<br>
+    Aşağıdaki egzersizleri yapman boyun ve omuz ağrısını önler.
+  </div>
+  <div class="egzersiz-grid">
+    <div class="egzersiz-kart">
+      <div class="ikon">🔄</div>
+      <div class="metin"><strong>Boyun Rotasyonu</strong>Başını yavaşça sağa-sola döndür. Her yanda 5 saniye tut. 3 tekrar.</div>
+    </div>
+    <div class="egzersiz-kart">
+      <div class="ikon">⬆️</div>
+      <div class="metin"><strong>Omuz Açma</strong>İki omzunu kulaklarına doğru kaldır, 3 saniye tut ve bırak. 5 tekrar.</div>
+    </div>
+    <div class="egzersiz-kart">
+      <div class="ikon">↔️</div>
+      <div class="metin"><strong>Boyun Germe</strong>Başını yavaşça sağ omzuna eğ, sol elle hafifçe bas. 10 saniye bekle.</div>
+    </div>
+    <div class="egzersiz-kart">
+      <div class="ikon">👁️</div>
+      <div class="metin"><strong>20-20-20 Kuralı</strong>20 saniye boyunca 6 metre uzaktaki bir noktaya bak. Göz yorgunluğunu azaltır.</div>
+    </div>
+  </div>
+  <div class="mola-butonlar">
+    <button class="buton buton-ana" onclick="molayiKapat(false)">✓ Molayı Tamamladım</button>
+    <button class="buton buton-gec" onclick="molayiKapat(true)">Atla</button>
+  </div>
+</div>
+
+<header>
+  <div class="logo-alani">
+    <div class="logo-kutu">🏃</div>
+    <div class="logo-yazi">Postür<span>Takip</span></div>
+  </div>
+
+  <div class="mola-pill" id="molaPill" onclick="molayiAc()" title="Mola hatırlatıcısı">
+    <span>⏱</span>
+    <span id="molaSayac">Mola: 45:00</span>
+  </div>
+
+  <div class="sag-menu">
+    <span id="oturumSaati">Oturum: 00:00</span>
+    <div class="durum-rozet">
+      <div class="nokta" id="durumNokta"></div>
+      <span id="durumYazi">Bağlanıyor…</span>
+    </div>
+  </div>
+</header>
+
+<div class="icerik">
+
+  <div class="sol-sutun">
+    <div class="kamera-kutu">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="canvas"></canvas>
+      <div id="kameraCerceve"></div>
+      <div id="kameraYazi"></div>
+    </div>
+
+    <div class="istatistikler">
+      <div class="stat-kutu">
+        <div class="etiket">Postür Skoru</div>
+        <div class="deger" id="st-skor" style="color:#94a3b8">–</div>
+      </div>
+      <div class="stat-kutu">
+        <div class="etiket">İyi Duruş</div>
+        <div class="deger" id="st-iyi" style="color:#22c55e">0%</div>
+      </div>
+      <div class="stat-kutu">
+        <div class="etiket">Uyarı Sayısı</div>
+        <div class="deger" id="st-uyari" style="color:#f59e0b">0</div>
+      </div>
+      <div class="stat-kutu">
+        <div class="etiket">Aktif Sorun</div>
+        <div class="deger" id="st-sorun" style="color:#ef4444">0</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sag-sutun">
+
+    <div class="skor-kart">
+      <div class="kart-baslik">Genel Duruş Skoru</div>
+      <div class="halka-sargisi">
+        <svg class="halka-svg" viewBox="0 0 130 130">
+          <circle class="halka-arka" cx="65" cy="65" r="55"/>
+          <circle class="halka-on" id="halkaOn" cx="65" cy="65" r="55"
+                  stroke-dasharray="345.4" stroke-dashoffset="345.4"
+                  stroke="#22c55e"/>
+        </svg>
+        <div class="halka-sayi" id="halkaSayi">–</div>
+      </div>
+      <div class="halka-aciklama" id="halkaAciklama" style="color:#94a3b8">Kamera Bekleniyor</div>
+    </div>
+
+    <div class="metrik-kart">
+      <div class="kart-baslik">Üst Vücut Ölçümleri</div>
+
+      <div class="metrik-satir">
+        <div class="metrik-bilgi">
+          <div class="ad">Boyun Öne Eğimi</div>
+          <div class="alt">Kulak ile omuz dikey hizası</div>
+        </div>
+        <div class="metrik-sag">
+          <div class="metrik-deger" id="d-boyun">–</div>
+          <div class="bar-kap"><div class="bar-ic" id="b-boyun" style="width:0%"></div></div>
+          <div class="durum-etiket d-bos" id="e-boyun">–</div>
+        </div>
+      </div>
+
+      <div class="metrik-satir">
+        <div class="metrik-bilgi">
+          <div class="ad">Baş Eğimi</div>
+          <div class="alt">Sol ve sağ kulak yükseklik farkı</div>
+        </div>
+        <div class="metrik-sag">
+          <div class="metrik-deger" id="d-bas">–</div>
+          <div class="bar-kap"><div class="bar-ic" id="b-bas" style="width:0%"></div></div>
+          <div class="durum-etiket d-bos" id="e-bas">–</div>
+        </div>
+      </div>
+
+      <div class="metrik-satir">
+        <div class="metrik-bilgi">
+          <div class="ad">Omuz Eğimi</div>
+          <div class="alt">Omuz hattının yatay açısı</div>
+        </div>
+        <div class="metrik-sag">
+          <div class="metrik-deger" id="d-omuz">–</div>
+          <div class="bar-kap"><div class="bar-ic" id="b-omuz" style="width:0%"></div></div>
+          <div class="durum-etiket d-bos" id="e-omuz">–</div>
+        </div>
+      </div>
+
+      <div class="metrik-satir">
+        <div class="metrik-bilgi">
+          <div class="ad">Omuz Gerginliği</div>
+          <div class="alt">Omuzların kulağa yakınlık oranı</div>
+        </div>
+        <div class="metrik-sag">
+          <div class="metrik-deger" id="d-gerginlik">–</div>
+          <div class="bar-kap"><div class="bar-ic" id="b-gerginlik" style="width:0%"></div></div>
+          <div class="durum-etiket d-bos" id="e-gerginlik">–</div>
+        </div>
+      </div>
+
+      <div class="metrik-satir">
+        <div class="metrik-bilgi">
+          <div class="ad">Merkez Hizası</div>
+          <div class="alt">Başın omuz ortasına yatay uzaklığı</div>
+        </div>
+        <div class="metrik-sag">
+          <div class="metrik-deger" id="d-merkez">–</div>
+          <div class="bar-kap"><div class="bar-ic" id="b-merkez" style="width:0%"></div></div>
+          <div class="durum-etiket d-bos" id="e-merkez">–</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="uyari-kart">
+      <div class="kart-baslik">Aktif Uyarılar</div>
+      <div id="uyariListesi">
+        <div class="uyari-yok">✓ Aktif uyarı yok, duruşun iyi görünüyor</div>
+      </div>
+    </div>
+
+    <div class="ipucu-kart">
+      <div class="ipucu-ikon">💡</div>
+      <div class="ipucu-metin">
+        <strong>Ergonomi İpucu</strong>
+        <span id="ipucuYazi">Ekran göz hizasında olmalı. Boynu aşağı eğmemek için monitörü yükselt veya laptop altına bir kitap koy.</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+
+<script>
+
+var GENISLIK  = 640;
+var YUKSEKLIK = 480;
+
+var videoEl = document.getElementById('video');
+var kanvas  = document.getElementById('canvas');
+var ctx     = kanvas.getContext('2d');
+kanvas.width  = GENISLIK;
+kanvas.height = YUKSEKLIK;
+
+var toplamKare      = 0;
+var iyiKare         = 0;
+var uyariSayisi     = 0;
+var sonBuyukUyari   = 0;
+var oturumBaslangic = Date.now();
+
+// her saniye oturum saatini güncelle
+setInterval(function() {
+  var gecen = Math.floor((Date.now() - oturumBaslangic) / 1000);
+  var dk = String(Math.floor(gecen / 60)).padStart(2, '0');
+  var sn = String(gecen % 60).padStart(2, '0');
+  document.getElementById('oturumSaati').textContent = 'Oturum: ' + dk + ':' + sn;
+}, 1000);
+
+
+// mola sayacı - 45 dakikada bir hatırlatıyor
+var MOLA_SURE = 45 * 60; // saniye
+var molaSaniye = MOLA_SURE;
+
+setInterval(function() {
+  molaSaniye = molaSaniye - 1;
+  if (molaSaniye < 0) molaSaniye = 0;
+
+  var dk = Math.floor(molaSaniye / 60);
+  var sn = String(molaSaniye % 60).padStart(2, '0');
+  document.getElementById('molaSayac').textContent = 'Mola: ' + dk + ':' + sn;
+
+  var pill = document.getElementById('molaPill');
+  if (molaSaniye === 0) {
+    molayiAc();
+    molaSaniye = MOLA_SURE;
+  } else if (molaSaniye <= 5 * 60) {
+    pill.className = 'mola-pill simdi';
+  } else if (molaSaniye <= 10 * 60) {
+    pill.className = 'mola-pill yakin';
+  } else {
+    pill.className = 'mola-pill';
+  }
+}, 1000);
+
+function molayiAc() {
+  document.getElementById('molaEkrani').classList.add('acik');
+}
+function molayiKapat(atla) {
+  document.getElementById('molaEkrani').classList.remove('acik');
+  if (!atla) {
+    molaSaniye = MOLA_SURE;
+  }
+}
+
+
+// ergonomi ipuçları - 25 saniyede bir değişiyor
+var ipuclari = [
+  "Ekran göz hizasında olmalı. Boynu aşağı eğmemek için monitörü yükselt veya laptop altına bir kitap koy.",
+  "Her 20 dakikada bir, 20 saniye boyunca 6 metre uzaktaki bir noktaya bak. Buna 20-20-20 kuralı deniyor.",
+  "Omuzlarının farkında ol. Stres anında omuzları kulağa doğru kaldırmak trapez kasını yorar.",
+  "Sandalyeni ayarla: dizler 90 derece, ayaklar yerde, dirsekler masa yüzeyiyle aynı hizada olmalı.",
+  "Boynu öne eğmek her 2.5 cm için omurgaya 4 kg ek yük bindirir. 45 derecede bu 22 kg'a çıkıyor.",
+  "Mouse ve klavye uzağa uzanmayı gerektirmemeli. Bilek önkol ile aynı düz çizgide durmalı.",
+  "2 saatte bir kalk ve 5 dakika yürü. Uzun süre oturmak omurga diskleri için zararlı.",
+  "Sandalye bel desteği olmalı. Bel ile sandalye arasında boşluk varsa ince bir yastık koy.",
+];
+var siradakiIpucu = 0;
+
+setInterval(function() {
+  siradakiIpucu = (siradakiIpucu + 1) % ipuclari.length;
+  var el = document.getElementById('ipucuYazi');
+  el.style.opacity = '0';
+  setTimeout(function() {
+    el.textContent = ipuclari[siradakiIpucu];
+    el.style.opacity = '1';
+  }, 300);
+}, 25000);
+document.getElementById('ipucuYazi').style.transition = 'opacity 0.3s';
+
+
+// landmark indeksinden piksel konumunu al
+function lmPiksel(lm, indeks) {
+  var x = lm[indeks].x * GENISLIK;
+  var y = lm[indeks].y * YUKSEKLIK;
+  return { x: x, y: y };
+}
+
+// iki noktanın ortasını bul
+function ortaNokta(a, b) {
+  return {
+    x: (a.x + b.x) / 2,
+    y: (a.y + b.y) / 2
+  };
+}
+
+// dikey eksene açı hesabı (0-90 derece)
+// kamera görüntüsü aynalı olduğu için Math.abs kullandım, sağ-sol yön önemli değil
+function dikelAci(p1, p2) {
+  var dx = Math.abs(p2.x - p1.x);
+  var dy = Math.abs(p2.y - p1.y);
+  var aci = Math.atan2(dx, dy) * 180 / Math.PI;
+  return aci;
+}
+
+// yatay eksene açı hesabı
+function yatayAci(p1, p2) {
+  var dx = Math.abs(p2.x - p1.x);
+  var dy = Math.abs(p2.y - p1.y);
+  var aci = Math.atan2(dy, dx) * 180 / Math.PI;
+  return aci;
+}
+
+
+// tüm postür hesaplamalarını yapar
+function posturHesapla(lm) {
+  var solKulak = lmPiksel(lm, 7);
+  var sagKulak = lmPiksel(lm, 8);
+  var solOmuz  = lmPiksel(lm, 11);
+  var sagOmuz  = lmPiksel(lm, 12);
+
+  var kulakOrta = ortaNokta(solKulak, sagKulak);
+  var omuzOrta  = ortaNokta(solOmuz, sagOmuz);
+  var omuzGen   = Math.abs(sagOmuz.x - solOmuz.x);
+
+  // boyun açısı - omuz ile kulak arası dikey açı
+  var boynuAci = dikelAci(omuzOrta, kulakOrta);
+
+  // baş eğimi - iki kulağın yükseklik farkı
+  var basEgimi = Math.abs(solKulak.y - sagKulak.y) / YUKSEKLIK * 100;
+
+  // omuz eğimi
+  var omuzEgimi = yatayAci(solOmuz, sagOmuz);
+
+  // omuz gerginliği - kulak ile omuz mesafesini omuz genişliğine bölerek hesaplıyorum
+  // oran düşükse omuzlar kulağa yakın = gergin demek
+  var kulakOmuzMesafe = omuzOrta.y - kulakOrta.y;
+  if (kulakOmuzMesafe < 0) kulakOmuzMesafe = 0;
+
+  var mesafeOrani = 0.5;
+  if (omuzGen > 0) {
+    mesafeOrani = kulakOmuzMesafe / omuzGen;
+  }
+
+  var gerginlik = (0.5 - mesafeOrani) / 0.5 * 100;
+  if (gerginlik < 0) gerginlik = 0;
+  if (gerginlik > 100) gerginlik = 100;
+
+  // merkez kayması - başın sağa veya sola ne kadar kaydığı
+  var merkezKayma = 0;
+  if (omuzGen > 0) {
+    merkezKayma = Math.abs(kulakOrta.x - omuzOrta.x) / omuzGen * 100;
+  }
+
+  return {
+    boynuAci:    boynuAci,
+    basEgimi:    basEgimi,
+    omuzEgimi:   omuzEgimi,
+    gerginlik:   gerginlik,
+    merkezKayma: merkezKayma,
+    solKulak:    solKulak,
+    sagKulak:    sagKulak,
+    solOmuz:     solOmuz,
+    sagOmuz:     sagOmuz,
+    kulakOrta:   kulakOrta,
+    omuzOrta:    omuzOrta,
+    omuzGen:     omuzGen
+  };
+}
+
+
+// eşik değerlerine göre iyi/orta/kotu döndürür
+function durumBelirle(deger, uyariEsik, kotuEsik) {
+  if (deger < uyariEsik) {
+    return 'iyi';
+  } else if (deger < kotuEsik) {
+    return 'orta';
+  } else {
+    return 'kotu';
+  }
+}
+
+// duruma göre renk döndürür
+function durumRengi(durum) {
+  if (durum === 'iyi')  return '#22c55e';
+  if (durum === 'orta') return '#f59e0b';
+  return '#ef4444';
+}
+
+// metrik satırını günceller
+function satirGuncelle(anahtar, deger, uyariE, kotuE, maks, birim) {
+  if (!birim) birim = '°';
+
+  var durum = durumBelirle(deger, uyariE, kotuE);
+  var renk  = durumRengi(durum);
+
+  var etiketMetni, etiketSinifi;
+  if (durum === 'iyi') {
+    etiketMetni  = 'Normal';
+    etiketSinifi = 'd-iyi';
+  } else if (durum === 'orta') {
+    etiketMetni  = 'Dikkat';
+    etiketSinifi = 'd-orta';
+  } else {
+    etiketMetni  = 'Bozuk';
+    etiketSinifi = 'd-kotu';
+  }
+
+  var yuzde = deger / maks * 100;
+  if (yuzde > 100) yuzde = 100;
+
+  document.getElementById('d-' + anahtar).textContent    = deger.toFixed(1) + birim;
+  document.getElementById('d-' + anahtar).style.color    = renk;
+  document.getElementById('b-' + anahtar).style.width      = yuzde + '%';
+  document.getElementById('b-' + anahtar).style.background = renk;
+
+  var etiketEl = document.getElementById('e-' + anahtar);
+  etiketEl.textContent = etiketMetni;
+  etiketEl.className   = 'durum-etiket ' + etiketSinifi;
+
+  return durum;
+}
+
+// skor halkasını günceller
+function skorGuncelle(skor) {
+  // r=55, cevre = 2 * pi * 55
+  var cevre  = 2 * Math.PI * 55;
+  var offset = cevre * (1 - skor / 100);
+  document.getElementById('halkaOn').style.strokeDashoffset = offset;
+
+  var renk, aciklama;
+  if (skor >= 85) {
+    renk     = '#22c55e';
+    aciklama = 'Mükemmel Duruş ✓';
+  } else if (skor >= 70) {
+    renk     = '#84cc16';
+    aciklama = 'İyi Duruş';
+  } else if (skor >= 52) {
+    renk     = '#f59e0b';
+    aciklama = 'Geliştirilebilir';
+  } else if (skor >= 32) {
+    renk     = '#f97316';
+    aciklama = 'Duruşa Dikkat Et!';
+  } else {
+    renk     = '#ef4444';
+    aciklama = 'Kötü Duruş!';
+  }
+
+  document.getElementById('halkaOn').style.stroke          = renk;
+  document.getElementById('halkaSayi').textContent         = Math.round(skor);
+  document.getElementById('halkaSayi').style.color         = renk;
+  document.getElementById('halkaAciklama').textContent     = aciklama;
+  document.getElementById('halkaAciklama').style.color     = renk;
+  document.getElementById('st-skor').textContent           = Math.round(skor);
+  document.getElementById('st-skor').style.color           = renk;
+}
+
+// uyarı listesini günceller
+function uyarilariGuncelle(sorunlar) {
+  document.getElementById('st-sorun').textContent = sorunlar.length;
+
+  if (sorunlar.length === 0) {
+    document.getElementById('uyariListesi').innerHTML =
+      '<div class="uyari-yok">✓ Harika! Duruşun sağlıklı görünüyor</div>';
+    return;
+  }
+
+  var html = '';
+  for (var i = 0; i < sorunlar.length; i++) {
+    var s = sorunlar[i];
+    html += '<div class="uyari-satir">';
+    html += '<span class="uyari-ikon">' + s.ikon + '</span>';
+    html += '<div>';
+    html += '<div class="uyari-baslik">' + s.mesaj + '</div>';
+    html += '<div class="uyari-not">' + s.ipucu + '</div>';
+    html += '</div>';
+    html += '</div>';
+  }
+  document.getElementById('uyariListesi').innerHTML = html;
+}
+
+
+// üst vücut iskelet bağlantıları (mediapipe landmark numaraları)
+var iskBaglar   = [[11,12],[7,11],[8,12],[11,13],[13,15],[12,14],[14,16]];
+var iskNoktalar = [7, 8, 11, 12, 13, 14, 15, 16];
+
+function iskeletCiz(lm, renk) {
+  ctx.strokeStyle = renk + 'aa';
+  ctx.lineWidth   = 2.5;
+  ctx.lineCap     = 'round';
+
+  for (var i = 0; i < iskBaglar.length; i++) {
+    var a = iskBaglar[i][0];
+    var b = iskBaglar[i][1];
+    if (!lm[a] || !lm[b]) continue;
+    ctx.beginPath();
+    ctx.moveTo(lm[a].x * GENISLIK, lm[a].y * YUKSEKLIK);
+    ctx.lineTo(lm[b].x * GENISLIK, lm[b].y * YUKSEKLIK);
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = renk;
+  for (var j = 0; j < iskNoktalar.length; j++) {
+    var idx = iskNoktalar[j];
+    if (!lm[idx]) continue;
+    ctx.beginPath();
+    ctx.arc(lm[idx].x * GENISLIK, lm[idx].y * YUKSEKLIK, 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function cizgi(p1, p2, renk, kalinlik) {
+  if (!kalinlik) kalinlik = 3;
+  ctx.strokeStyle = renk;
+  ctx.lineWidth   = kalinlik;
+  ctx.lineCap     = 'round';
+  ctx.beginPath();
+  ctx.moveTo(p1.x, p1.y);
+  ctx.lineTo(p2.x, p2.y);
+  ctx.stroke();
+}
+
+function daire(p, renk, r) {
+  if (!r) r = 6;
+  ctx.fillStyle = renk;
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// kesik dikey referans çizgisi
+function dikeyRef(x) {
+  ctx.strokeStyle = 'rgba(250, 204, 21, 0.28)';
+  ctx.lineWidth   = 1;
+  ctx.setLineDash([5, 6]);
+  ctx.beginPath();
+  ctx.moveTo(x, 0);
+  ctx.lineTo(x, YUKSEKLIK);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+// açı yayı çizer
+function aciYayi(merkez, p1, p2, r, renk) {
+  var a1 = Math.atan2(p1.y - merkez.y, p1.x - merkez.x);
+  var a2 = Math.atan2(p2.y - merkez.y, p2.x - merkez.x);
+  ctx.save();
+  ctx.strokeStyle = renk;
+  ctx.lineWidth   = 2;
+  ctx.globalAlpha = 0.65;
+  ctx.beginPath();
+  ctx.arc(merkez.x, merkez.y, r, a1, a2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// canvas üzerine arka planlı metin yaz
+function kanvasYazi(metin, p, renk, dx, dy) {
+  if (!dx) dx = 8;
+  if (!dy) dy = -6;
+  ctx.save();
+  ctx.font = 'bold 11px Segoe UI';
+  var tw = ctx.measureText(metin).width;
+  ctx.fillStyle = 'rgba(0,0,0,0.65)';
+  ctx.fillRect(p.x + dx - 2, p.y + dy - 12, tw + 4, 15);
+  ctx.fillStyle = renk;
+  ctx.fillText(metin, p.x + dx, p.y + dy);
+  ctx.restore();
+}
+
+
+// mediapipe'den kare gelince çalışan ana fonksiyon
+function sonucIsle(sonuc) {
+  ctx.clearRect(0, 0, GENISLIK, YUKSEKLIK);
+
+  if (!sonuc.poseLandmarks) {
+    document.getElementById('durumYazi').textContent    = 'Kişi Bulunamadı';
+    document.getElementById('durumNokta').className     = 'nokta';
+    document.getElementById('kameraCerceve').className  = '';
+    document.getElementById('kameraYazi').className     = '';
+    document.getElementById('tehlikeBorder').classList.remove('acik');
+    return;
+  }
+
+  document.getElementById('durumNokta').className  = 'nokta canli';
+  document.getElementById('durumYazi').textContent = 'Analiz Ediliyor';
+
+  var lm   = sonuc.poseLandmarks;
+  var veri = posturHesapla(lm);
+
+  // her metriğin durumunu belirle
+  var boynDurum = durumBelirle(veri.boynuAci,    12, 22);
+  var basDurum  = durumBelirle(veri.basEgimi,      3,  6);
+  var omuzDurum = durumBelirle(veri.omuzEgimi,     4,  9);
+  var gergDurum = durumBelirle(veri.gerginlik,    22, 45);
+  var merkDurum = durumBelirle(veri.merkezKayma,   7, 14);
+
+  // toplam skoru hesapla - boyun en önemli metrik, bu yüzden ağırlığı yüksek tuttum
+  // değerleri test ederek belirledim
+  var boynSkor = 100;
+  if (boynDurum === 'orta') boynSkor = 58;
+  if (boynDurum === 'kotu') boynSkor = 18;
+
+  var basSkor = 100;
+  if (basDurum === 'orta') basSkor = 58;
+  if (basDurum === 'kotu') basSkor = 18;
+
+  var omuzSkor = 100;
+  if (omuzDurum === 'orta') omuzSkor = 58;
+  if (omuzDurum === 'kotu') omuzSkor = 18;
+
+  var gergSkor = 100;
+  if (gergDurum === 'orta') gergSkor = 58;
+  if (gergDurum === 'kotu') gergSkor = 18;
+
+  var merkSkor = 100;
+  if (merkDurum === 'orta') merkSkor = 58;
+  if (merkDurum === 'kotu') merkSkor = 18;
+
+  var toplam = boynSkor * 0.35 + basSkor * 0.10 + omuzSkor * 0.15 + gergSkor * 0.25 + merkSkor * 0.15;
+
+  // sorun listesini oluştur
+  var sorunlar = [];
+
+  if (boynDurum === 'kotu')
+    sorunlar.push({ ikon:'🚨', mesaj:'Ciddi boyun eğimi (text neck)!', ipucu:'Başını geri çek, çeneni hafifçe içe al. Ekranı yükselt.' });
+  else if (boynDurum === 'orta')
+    sorunlar.push({ ikon:'🔴', mesaj:'Boyun öne eğik', ipucu:'Kulağın omzun hizasında olmalı. Monitörü biraz yükselt.' });
+
+  if (basDurum === 'kotu')
+    sorunlar.push({ ikon:'🔴', mesaj:'Baş belirgin şekilde yana eğik', ipucu:'Telefona veya yan ekrana bakıyor olabilirsin.' });
+  else if (basDurum === 'orta')
+    sorunlar.push({ ikon:'🟡', mesaj:'Baş hafif yana eğik', ipucu:'İki kulak aynı yükseklikte olmalı.' });
+
+  if (omuzDurum === 'kotu')
+    sorunlar.push({ ikon:'🔴', mesaj:'Omuz dengesizliği var!', ipucu:'İki omzunu eşit seviyede tut.' });
+  else if (omuzDurum === 'orta')
+    sorunlar.push({ ikon:'🟡', mesaj:'Omuz hafif eğik', ipucu:'Omuzlarını düzleştirmeye çalış.' });
+
+  if (gergDurum === 'kotu')
+    sorunlar.push({ ikon:'🚨', mesaj:'Omuz gerginliği çok yüksek!', ipucu:'Omuzlarını aşağı bırak. Nefes ver ve gevşet.' });
+  else if (gergDurum === 'orta')
+    sorunlar.push({ ikon:'🟡', mesaj:'Omuzlar hafif gerilmiş', ipucu:'Farkında olmadan omuzlarını kaldırıyor olabilirsin.' });
+
+  if (merkDurum === 'kotu')
+    sorunlar.push({ ikon:'🔴', mesaj:'Baş yana kaymış', ipucu:'Başını omuz ortasına hizala.' });
+  else if (merkDurum === 'orta')
+    sorunlar.push({ ikon:'🟡', mesaj:'Baş hafif yana kaymış', ipucu:'Gövdeye göre başını ortala.' });
+
+  // iskelet rengini duruma göre ayarla
+  var iskRenk = '#ef4444';
+  if (toplam >= 70) iskRenk = '#22c55e';
+  else if (toplam >= 45) iskRenk = '#f59e0b';
+
+  iskeletCiz(lm, iskRenk);
+
+  // analiz çizgilerini çiz
+  dikeyRef(veri.omuzOrta.x);
+  cizgi(veri.omuzOrta, veri.kulakOrta, durumRengi(boynDurum), 4);
+  cizgi(veri.solOmuz,  veri.sagOmuz,   durumRengi(omuzDurum), 3.5);
+  cizgi(veri.solKulak, veri.sagKulak,  durumRengi(basDurum),  2.5);
+  cizgi(veri.solKulak, veri.solOmuz,   durumRengi(gergDurum), 2);
+  cizgi(veri.sagKulak, veri.sagOmuz,   durumRengi(gergDurum), 2);
+
+  var dikeySabit = { x: veri.omuzOrta.x, y: veri.omuzOrta.y - 52 };
+  aciYayi(veri.omuzOrta, dikeySabit, veri.kulakOrta, 40, durumRengi(boynDurum));
+
+  daire(veri.omuzOrta,  '#ffffff', 5);
+  daire(veri.kulakOrta, '#ffffff', 4);
+  daire(veri.solKulak,  iskRenk, 4);
+  daire(veri.sagKulak,  iskRenk, 4);
+  daire(veri.solOmuz,   iskRenk, 4);
+  daire(veri.sagOmuz,   iskRenk, 4);
+
+  kanvasYazi('Boyun ' + veri.boynuAci.toFixed(0) + '°',
+    ortaNokta(veri.omuzOrta, veri.kulakOrta), durumRengi(boynDurum), 8, -4);
+  kanvasYazi('Omuz ' + veri.omuzEgimi.toFixed(0) + '°',
+    ortaNokta(veri.solOmuz, veri.sagOmuz), durumRengi(omuzDurum), 6, 16);
+  kanvasYazi('Gerg. %' + veri.gerginlik.toFixed(0),
+    veri.omuzOrta, durumRengi(gergDurum), -80, 20);
+
+  // paneli güncelle
+  skorGuncelle(toplam);
+  satirGuncelle('boyun',    veri.boynuAci,    12, 22, 40);
+  satirGuncelle('bas',      veri.basEgimi,     3,  6, 12, '%');
+  satirGuncelle('omuz',     veri.omuzEgimi,    4,  9, 18);
+  satirGuncelle('gerginlik',veri.gerginlik,   22, 45, 80, '%');
+  satirGuncelle('merkez',   veri.merkezKayma,  7, 14, 25, '%');
+  uyarilariGuncelle(sorunlar);
+
+  toplamKare++;
+  if (sorunlar.length === 0) iyiKare++;
+
+  var iyiYuzde = 0;
+  if (toplamKare > 0) {
+    iyiYuzde = Math.round(iyiKare / toplamKare * 100);
+  }
+  document.getElementById('st-iyi').textContent = iyiYuzde + '%';
+
+  // kamera çerçevesi ve uyarılar
+  if (sorunlar.length === 0) {
+    document.getElementById('kameraCerceve').className = 'iyi';
+    document.getElementById('kameraYazi').className    = 'iyi';
+    document.getElementById('kameraYazi').textContent  = '✓ Duruş Güzel';
+    document.getElementById('tehlikeBorder').classList.remove('acik');
+    document.getElementById('buyukUyari').classList.remove('goster');
+  } else {
+    // en kritik sorunu bul
+    var enKotu = null;
+    for (var k = 0; k < sorunlar.length; k++) {
+      if (sorunlar[k].ikon === '🚨') {
+        enKotu = sorunlar[k];
+        break;
+      }
+    }
+    if (!enKotu) enKotu = sorunlar[0];
+
+    document.getElementById('kameraCerceve').className = 'kotu';
+    document.getElementById('kameraYazi').className    = 'kotu';
+    document.getElementById('kameraYazi').textContent  = '⚠ ' + enKotu.mesaj;
+    document.getElementById('tehlikeBorder').classList.add('acik');
+
+    // skor çok düşükse büyük uyarı göster, ama 5 saniyede bir
+    var simdi = Date.now();
+    if (toplam < 33 && simdi - sonBuyukUyari > 5000) {
+      sonBuyukUyari = simdi;
+      uyariSayisi++;
+      document.getElementById('st-uyari').textContent = uyariSayisi;
+
+      document.getElementById('buyukUyariAlt').textContent = enKotu.mesaj;
+      document.getElementById('buyukUyari').classList.remove('goster');
+      void document.getElementById('buyukUyari').offsetWidth;
+      document.getElementById('buyukUyari').classList.add('goster');
+      setTimeout(function() {
+        document.getElementById('buyukUyari').classList.remove('goster');
+      }, 2800);
+    }
+  }
+}
+
+
+// mediapipe pose kurulumu
+var pose = new Pose({
+  locateFile: function(dosya) {
+    return 'https://cdn.jsdelivr.net/npm/@mediapipe/pose/' + dosya;
+  }
+});
+
+pose.setOptions({
+  modelComplexity: 1,
+  smoothLandmarks: true,
+  enableSegmentation: false,
+  minDetectionConfidence: 0.6,
+  minTrackingConfidence: 0.6
+});
+
+pose.onResults(sonucIsle);
+
+// kamerayı aç
+navigator.mediaDevices.getUserMedia({
+  video: { width: GENISLIK, height: YUKSEKLIK, facingMode: 'user' }
+}).then(function(stream) {
+  videoEl.srcObject = stream;
+  document.getElementById('durumNokta').className  = 'nokta canli';
+  document.getElementById('durumYazi').textContent = 'Kamera Bağlandı';
+}).catch(function() {
+  document.getElementById('durumYazi').textContent = 'Kamera açılamadı!';
+});
+
+var kamera = new Camera(videoEl, {
+  onFrame: async function() {
+    await pose.send({ image: videoEl });
+  },
+  width: GENISLIK,
+  height: YUKSEKLIK
+});
+kamera.start();
+
+</script>
+</body>
+</html>
